@@ -1,0 +1,3 @@
+#!/usr/bin/bash
+
+exec vi cmd/ask-ollama/main.go pkg/LLM/*.go pkg/linewrap/linewrap.go pkg/database/{db,sqlite3}.go pkg/config/config.go pkg/ollama/ollama.go
