@@ -10,7 +10,7 @@ import (
 const TestModel = "llama3.1"
 
 func TestNewClient(t *testing.T) {
-	client := NewClient("dummy-api-key")
+	client := NewClient("", "dummy-api-key")
 	if client.APIKey != "dummy-api-key" {
 		t.Errorf("Expected API key not set correctly")
 	}
@@ -26,7 +26,7 @@ func TestChatCompletion(t *testing.T) {
 		}},
 	}
 
-	testClient := NewClient("test-key")
+	testClient := NewClient("http://bamf.midgaard.xyz:11434", "test-key")
 	resp, err := testClient.ChatCompletion(req)
 
 	if err != nil {
@@ -55,7 +55,7 @@ func TestChatCompletion(t *testing.T) {
 // }
 
 func TestRateLimiting(t *testing.T) {
-	client := NewClient("test-key")
+	client := NewClient("", "test-key")
 
 	for i := 0; i < 5; i++ {
 		req := ChatCompletionRequest{

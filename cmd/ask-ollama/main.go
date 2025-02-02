@@ -15,51 +15,59 @@ import (
 	"github.com/duluk/ask-ollama/pkg/database"
 )
 
-// I'm probably writing "Ruby Go"...
-
 func main() {
 	var err error
 
-	opts, err := config.Initialize()
+	conf, err := config.Initialize()
 	if err != nil {
 		fmt.Println("Error initializing config: ", err)
 		os.Exit(1)
 	}
 
-	if opts.DumpConfig {
-		config.DumpConfig(opts)
+	if conf.Opts.DumpConfig {
+		conf.DumpConfig()
+		// TODO: Should it exit or keep going?
+		os.Exit(0)
 	}
 
-	err = os.MkdirAll(filepath.Dir(opts.LogFileName), 0755)
+	err = os.MkdirAll(filepath.Dir(conf.Logging.LogFile), 0755)
 	if err != nil {
 		fmt.Println("Error creating log directory: ", err)
 		os.Exit(1)
 	}
 
 	var log_fd *os.File
-	log_fd, err = os.OpenFile(opts.LogFileName, os.O_RDWR|os.O_CREATE, 0644)
+	fmt.Printf("Opening log file: %s\n", conf.Logging.LogFile)
+	log_fd, err = os.OpenFile(conf.Logging.LogFile, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		fmt.Println("Error with chat log file: ", err)
 	}
 	defer log_fd.Close()
 
 	// If DB exists, it just opens it; otherwise, it creates it first
-	db, err := database.InitializeDB(opts.DBFileName, opts.DBTable)
+	fmt.Printf("Opening database: %s\n", conf.Database.Path)
+	db, err := database.InitializeDB(conf.Database.Path, conf.Database.TableName)
 	if err != nil {
 		fmt.Println("Error opening database: ", err)
 		os.Exit(1)
 	}
 	defer db.Close()
 
-	model := opts.Model
+	model := conf.Opts.Model
+	if conf.Models[model].Name == "" {
+		fmt.Println("Unknown model: ", model)
+		os.Exit(1)
+	}
+	modelConfig := conf.Models[model]
+
 	/* CONTEXT? LOAD IT */
 	var promptContext []LLM.LLMConversations
-	if opts.ConversationID != 0 {
+	if conf.Opts.ConversationID != 0 {
 		// The user may provide `--continue` along with `--id`, but that's fine
 		// (and sensible). The intent is to load the one with the provided id.
 		// promptContext, err = LLM.LoadConversationFromLog(log_fd,
 		// opts.ConversationID)
-		promptContext, err = db.LoadConversationFromDB(opts.ConversationID)
+		promptContext, err = db.LoadConversationFromDB(conf.Opts.ConversationID)
 		if !pflag.CommandLine.Changed("model") {
 			// model, _ = db.GetModel(opts.ConversationID)
 			model = promptContext[len(promptContext)-1].Model
@@ -67,7 +75,7 @@ func main() {
 		if err != nil {
 			fmt.Println("Error loading conversation from log: ", err)
 		}
-	} else if opts.ContinueChat {
+	} else if conf.Opts.ContinueChat {
 		promptContext, err = LLM.ContinueConversation(log_fd)
 		if !pflag.CommandLine.Changed("model") {
 			model = promptContext[len(promptContext)-1].Model
@@ -75,35 +83,42 @@ func main() {
 		if err != nil {
 			fmt.Println("Error reading log for continuing chat: ", err)
 		}
-	} else if opts.Context != 0 {
-		promptContext, err = LLM.LastNChats(log_fd, opts.Context)
-		if err != nil {
-			fmt.Println("Error loading chat context from log: ", err)
-		}
+		// } else if conf.Opts.Context != 0 {
+		// 	promptContext, err = LLM.LastNChats(log_fd, conf.Context)
+		// 	if err != nil {
+		// 		fmt.Println("Error loading chat context from log: ", err)
+		// 	}
 	}
 
+	systemPrompt := conf.Roles["default"].Prompt
+	if systemPrompt != "" {
+		systemPrompt = "You are a helpful assistant"
+	}
+
+	modelTemp := float32(modelConfig.Temperature)
 	clientArgs := LLM.ClientArgs{
-		Model:        &model,
-		SystemPrompt: &opts.SystemPrompt,
+		BaseURL:      &conf.General.BaseURL,
+		Model:        &modelConfig.Name,
+		SystemPrompt: &systemPrompt,
 		Context:      promptContext,
-		MaxTokens:    &opts.MaxTokens,
-		Temperature:  &opts.Temperature,
+		MaxTokens:    &modelConfig.MaxTokens,
+		Temperature:  &modelTemp,
 		Log:          log_fd,
 	}
 
 	// Make sure we are setting the correct conversation id when not provided
-	if opts.ConversationID == 0 {
+	if conf.Opts.ConversationID == 0 {
 		clientArgs.ConvID = LLM.FindLastConversationID(log_fd)
 		if clientArgs.ConvID == nil {
 			// Most likely this is the first conversation
 			clientArgs.ConvID = new(int)
 			*clientArgs.ConvID = 0
 		}
-		if !opts.ContinueChat {
+		if !conf.Opts.ContinueChat {
 			(*clientArgs.ConvID)++
 		}
 	} else {
-		clientArgs.ConvID = &opts.ConversationID
+		clientArgs.ConvID = &conf.Opts.ConversationID
 	}
 
 	/* GET THE PROMPT */
@@ -112,7 +127,7 @@ func main() {
 		prompt = pflag.Arg(0)
 		clientArgs.Prompt = &prompt
 
-		chatWithLLM(opts, clientArgs, db)
+		chatWithLLM(&conf.Opts, clientArgs, db)
 	} else {
 		// Gracefully handle CTRL-C interrupt signal
 		sig := make(chan os.Signal, 1)
@@ -154,9 +169,9 @@ func main() {
 			}
 			clientArgs.Prompt = &prompt
 
-			chatWithLLM(opts, clientArgs, db)
+			chatWithLLM(&conf.Opts, clientArgs, db)
 
-			opts.ContinueChat = true
+			conf.Opts.ContinueChat = true
 			promptContext, err = LLM.ContinueConversation(log_fd)
 			if err != nil {
 				fmt.Println("Error reading log for continuing chat: ", err)
@@ -175,13 +190,8 @@ func chatWithLLM(opts *config.Options, args LLM.ClientArgs, db *database.ChatDB)
 	model := *args.Model
 	continueChat := opts.ContinueChat
 
-	switch model {
-	case "ollama":
-		client = LLM.NewOllama()
-	default:
-		fmt.Println("Unknown model: ", model)
-		os.Exit(1)
-	}
+	client = LLM.NewOllama(*args.BaseURL)
+
 	LLM.LogChat(
 		log,
 		"User",

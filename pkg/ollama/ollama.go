@@ -10,8 +10,6 @@ import (
 	"net/url"
 )
 
-const OllamaBaseURL = ""
-
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -41,12 +39,14 @@ type ChatCompletionResponse struct {
 }
 
 type Client struct {
+	BaseURL    string
 	APIKey     string
 	HTTPClient *http.Client
 }
 
-func NewClient(apiKey string) *Client {
+func NewClient(baseURL, apiKey string) *Client {
 	return &Client{
+		BaseURL:    baseURL,
 		APIKey:     apiKey,
 		HTTPClient: &http.Client{},
 	}
@@ -65,7 +65,8 @@ func (c *Client) ChatCompletion(req ChatCompletionRequest) (*ChatCompletionRespo
 		return nil, fmt.Errorf("failed to marshal request: %v", err)
 	}
 
-	url, err := url.Parse(OllamaBaseURL)
+	baseURL := c.BaseURL + "/v1/chat/completion"
+	url, err := url.Parse(baseURL)
 	if err != nil {
 		log.Fatal(err)
 	}

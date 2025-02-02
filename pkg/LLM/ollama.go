@@ -8,11 +8,11 @@ import (
 	"github.com/duluk/ask-ollama/pkg/ollama"
 )
 
-func NewOllama() *Ollama {
+func NewOllama(baseURL string) *Ollama {
 	apiKey := ""
-	client := ollama.NewClient(apiKey)
+	client := ollama.NewClient(baseURL, apiKey)
 
-	return &Ollama{APIKey: apiKey, Client: client}
+	return &Ollama{BaseURL: baseURL, APIKey: apiKey, Client: client}
 }
 
 func (cs *Ollama) Chat(args ClientArgs, termWidth int, tabWidth int) (ClientResponse, error) {

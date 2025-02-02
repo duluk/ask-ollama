@@ -29,11 +29,13 @@ type Client interface {
 }
 
 type Ollama struct {
-	APIKey string
-	Client *ollama.Client
+	BaseURL string
+	APIKey  string
+	Client  *ollama.Client
 }
 
 type ClientArgs struct {
+	BaseURL      *string
 	Model        *string
 	Prompt       *string
 	SystemPrompt *string
