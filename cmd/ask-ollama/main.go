@@ -37,7 +37,6 @@ func main() {
 	}
 
 	var log_fd *os.File
-	fmt.Printf("Opening log file: %s\n", conf.Logging.LogFile)
 	log_fd, err = os.OpenFile(conf.Logging.LogFile, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		fmt.Println("Error with chat log file: ", err)
@@ -45,7 +44,6 @@ func main() {
 	defer log_fd.Close()
 
 	// If DB exists, it just opens it; otherwise, it creates it first
-	fmt.Printf("Opening database: %s\n", conf.Database.Path)
 	db, err := database.InitializeDB(conf.Database.Path, conf.Database.TableName)
 	if err != nil {
 		fmt.Println("Error opening database: ", err)
