@@ -92,6 +92,7 @@ func (c *Config) String() string {
 func Initialize() (*Config, error) {
 	configDir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "ask-ollama")
 	if configDir == "" {
+		fmt.Printf("XDG_CONFIG_HOME not set, using default\n")
 		configDir = filepath.Join(os.Getenv("HOME"), ".config", "ask-ollama")
 	}
 
@@ -146,6 +147,10 @@ func Initialize() (*Config, error) {
 	if err := viper.Unmarshal(&config, decoderConfig); err != nil {
 		return nil, fmt.Errorf("error unmarshaling config: %w", err)
 	}
+
+	// The directories need to be expanded for the log file and database file
+	config.Logging.LogFile = os.ExpandEnv(config.Logging.LogFile)
+	config.Database.Path = os.ExpandEnv(config.Database.Path)
 
 	// fmt.Printf("Config loaded: %+v\n", config)
 
