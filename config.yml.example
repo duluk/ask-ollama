@@ -1,0 +1,45 @@
+general:
+  base_url: "localhost:11434"
+
+models:
+  deepseek-r1:
+    name: "DeepSeek"
+    max_tokens: 16384
+    temperature: 0.3
+    top_p: 1.0
+    presence_penalty: 0.0
+    frequency_penalty: 0.0
+    timeout: 30
+  llama-3:
+    name: "Llama"
+    max_tokens: 16384
+    temperature: 0.7
+
+logging:
+  log_file: "$HOME/.config/ask-ollama/ask-ollama.log"
+  log_level: "INFO"
+  max_file_size: 10485760  # 10MB
+  backup_count: 5
+
+database:
+  type: "sqlite3"
+  path: "$HOME/.config/ask-ollama/ask-ollama.db"
+  table_name: "conversations"
+  backup_interval: 86400  # 24 hours in seconds
+
+roles:
+  default:
+    description: "A helpful AI assistant"
+    prompt: "You are a helpful AI assistant who provides clear and accurate information."
+
+  developer:
+    description: "Software development expert"
+    prompt: "You are an expert software developer with deep knowledge of programming languages, design patterns, and best practices."
+
+  analyst:
+    description: "Data analysis specialist"
+    prompt: "You are a data analyst who excels at interpreting data and explaining complex patterns in simple terms."
+
+  teacher:
+    description: "Educational assistant"
+    prompt: "You are a patient teacher who explains concepts clearly and builds upon fundamental understanding."
